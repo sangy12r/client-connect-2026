@@ -1,10 +1,11 @@
+import re
 import sqlite3
 from datetime import datetime
 
 import pandas as pd
 import streamlit as st
 
-from database import initialize_database, generate_rsvp_token, get_connection
+from database import initialize_database, get_connection
 
 
 initialize_database()
@@ -23,37 +24,16 @@ EVENT_TIME = "6:00 PM onwards"
 EVENT_VENUE = "To be announced"
 RSVP_DEADLINE = "Friday, 16 October 2026"
 
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 
 # ============================================================
-# CLIENT RSVP PAGE
+# CLIENT RSVP PAGE (single common link for every client)
 # ============================================================
 
-rsvp_token = st.query_params.get("rsvp")
+show_rsvp_page = st.query_params.get("rsvp") is not None
 
-if rsvp_token:
-    connection = get_connection()
-    client = connection.execute(
-        """
-        SELECT id, company, contact_name, designation, email,
-               rsvp_status, attendees, guest_name, rsvp_date
-        FROM clients
-        WHERE rsvp_token = ?
-        """,
-        (rsvp_token,),
-    ).fetchone()
-    connection.close()
-
-    if client is None:
-        st.error("This RSVP link is invalid or no longer available.")
-        st.stop()
-
-    client_id = client[0]
-    company = client[1]
-    contact_name = client[2]
-    current_status = client[5] or "Pending"
-    current_attendees = client[6] or 0
-    current_guest = client[7] or ""
-
+if show_rsvp_page:
     st.markdown(
         """
         <style>
@@ -75,8 +55,6 @@ if rsvp_token:
             border: 1px solid #dfe6ee;
             box-shadow: 0 5px 20px rgba(20, 50, 80, 0.08);
         }
-        .client-name { color: #063b6f; font-size: 1.55rem; font-weight: 700; }
-        .client-company { color: #667085; margin-bottom: 22px; }
         .event-info {
             background: #f5f8fc;
             padding: 20px;
@@ -98,9 +76,7 @@ if rsvp_token:
                 <p>{EVENT_SUBTITLE}</p>
             </div>
             <div class="rsvp-card">
-                <div class="client-name">Dear {contact_name},</div>
-                <div class="client-company">{company}</div>
-                <p>We are pleased to invite you to our Client Networking Evening.</p>
+                <p>You're invited to our Client Networking Evening. Please confirm your attendance below.</p>
                 <div class="event-info">
                     <strong>Date</strong><br>{EVENT_DATE}<br><br>
                     <strong>Time</strong><br>{EVENT_TIME}<br><br>
@@ -111,70 +87,72 @@ if rsvp_token:
         unsafe_allow_html=True,
     )
 
-    st.markdown("### Will you be joining us?")
+    if st.session_state.get("rsvp_saved"):
+        st.success("Thank you. Your RSVP has been recorded successfully.")
+        st.session_state["rsvp_saved"] = False
 
-    if current_status == "Accepted":
-        st.success(
-            f"Your current response is Accepted, with {current_attendees} attendee(s)."
-        )
-    elif current_status == "Declined":
-        st.warning("Your current response is Declined.")
-
-    default_index = 0 if current_status == "Accepted" else 1 if current_status == "Declined" else 0
-
+    email = st.text_input("Email ID", placeholder="Enter your email ID")
+    name = st.text_input("Your Name", placeholder="Enter your name")
+    company = st.text_input("Company Name", placeholder="Enter your company name")
     response = st.radio(
-        "Please select your response",
-        ["Accept", "Decline"],
-        index=default_index,
+        "Will you be attending?",
+        ["Yes", "No", "Tentative"],
         horizontal=True,
     )
 
-    if response == "Accept":
-        attendees = st.number_input(
-            "Number attending",
-            min_value=1,
-            max_value=5,
-            value=current_attendees if current_attendees >= 1 else 1,
-            step=1,
-        )
-        guest_name = st.text_input(
-            "Guest name, if applicable",
-            value=current_guest,
-            placeholder="Enter guest name if you are bringing a guest",
-        )
-        st.caption("Please include yourself in the number of attendees.")
-    else:
-        attendees = 0
-        guest_name = ""
+    st.caption("Only one RSVP is recorded per email ID — submitting again updates your existing response.")
 
     if st.button("Confirm RSVP", type="primary", use_container_width=True):
-        connection = get_connection()
-        new_status = "Accepted" if response == "Accept" else "Declined"
-        connection.execute(
-            """
-            UPDATE clients
-            SET rsvp_status = ?,
-                attendees = ?,
-                guest_name = ?,
-                rsvp_date = ?,
-                invitation_opened = 1
-            WHERE id = ?
-            """,
-            (
-                new_status,
-                int(attendees),
-                guest_name.strip(),
-                datetime.now().isoformat(timespec="seconds"),
-                client_id,
-            ),
-        )
-        connection.commit()
-        connection.close()
-        st.session_state["rsvp_saved"] = True
-        st.rerun()
+        email_clean = email.strip().lower()
+        name_clean = name.strip()
+        company_clean = company.strip()
 
-    if st.session_state.get("rsvp_saved"):
-        st.success("Thank you. Your RSVP has been recorded successfully.")
+        if not email_clean or not EMAIL_PATTERN.match(email_clean):
+            st.error("Please enter a valid email ID.")
+        elif not name_clean:
+            st.error("Please enter your name.")
+        elif not company_clean:
+            st.error("Please enter your company name.")
+        else:
+            status_map = {"Yes": "Accepted", "No": "Declined", "Tentative": "Tentative"}
+            new_status = status_map[response]
+            attendees = 1 if new_status == "Accepted" else 0
+            now = datetime.now().isoformat(timespec="seconds")
+
+            connection = get_connection()
+            existing = connection.execute(
+                "SELECT id FROM clients WHERE email = ?", (email_clean,)
+            ).fetchone()
+
+            if existing:
+                connection.execute(
+                    """
+                    UPDATE clients
+                    SET company = ?,
+                        contact_name = ?,
+                        rsvp_status = ?,
+                        attendees = ?,
+                        rsvp_date = ?,
+                        invitation_opened = 1
+                    WHERE email = ?
+                    """,
+                    (company_clean, name_clean, new_status, attendees, now, email_clean),
+                )
+            else:
+                connection.execute(
+                    """
+                    INSERT INTO clients
+                        (company, contact_name, email, rsvp_status, attendees,
+                         rsvp_date, invitation_sent, invitation_opened)
+                    VALUES (?, ?, ?, ?, ?, ?, 1, 1)
+                    """,
+                    (company_clean, name_clean, email_clean, new_status, attendees, now),
+                )
+
+            connection.commit()
+            connection.close()
+            st.session_state["rsvp_saved"] = True
+            st.rerun()
 
     st.markdown(
         """
@@ -280,25 +258,24 @@ if page == "Dashboard":
     total_clients = connection.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
     accepted = connection.execute("SELECT COUNT(*) FROM clients WHERE rsvp_status = 'Accepted'").fetchone()[0]
     declined = connection.execute("SELECT COUNT(*) FROM clients WHERE rsvp_status = 'Declined'").fetchone()[0]
+    tentative = connection.execute("SELECT COUNT(*) FROM clients WHERE rsvp_status = 'Tentative'").fetchone()[0]
     pending = connection.execute("SELECT COUNT(*) FROM clients WHERE rsvp_status = 'Pending'").fetchone()[0]
     expected = connection.execute(
         "SELECT COALESCE(SUM(attendees), 0) FROM clients WHERE rsvp_status = 'Accepted'"
-    ).fetchone()[0]
-    links_generated = connection.execute(
-        "SELECT COUNT(*) FROM clients WHERE rsvp_token IS NOT NULL AND rsvp_token != ''"
     ).fetchone()[0]
     invitation_sent = connection.execute(
         "SELECT COUNT(*) FROM clients WHERE invitation_sent = 1"
     ).fetchone()[0]
     connection.close()
 
-    columns = st.columns(5)
+    columns = st.columns(6)
     for column, (title, value) in zip(
         columns,
         [
             ("INVITED", total_clients),
             ("ACCEPTED", accepted),
             ("DECLINED", declined),
+            ("TENTATIVE", tentative),
             ("PENDING", pending),
             ("EXPECTED", expected),
         ],
@@ -531,17 +508,19 @@ elif page == "Invitations":
         st.write(EVENT_VENUE)
 
     st.divider()
-    st.subheader("RSVP Link Settings")
+    st.subheader("Shared RSVP Link")
     base_url = st.text_input(
         "Application URL",
         value="http://localhost:8501",
         help="Use localhost while testing. Replace it with the public HTTPS URL after deployment.",
     )
 
+    shared_link = base_url.rstrip("/") + "/?rsvp=1"
+
     connection = get_connection()
     total_clients = connection.execute("SELECT COUNT(*) FROM clients").fetchone()[0]
-    links_generated = connection.execute(
-        "SELECT COUNT(*) FROM clients WHERE rsvp_token IS NOT NULL AND rsvp_token != ''"
+    responded = connection.execute(
+        "SELECT COUNT(*) FROM clients WHERE rsvp_status != 'Pending'"
     ).fetchone()[0]
     sent_count = connection.execute(
         "SELECT COUNT(*) FROM clients WHERE invitation_sent = 1"
@@ -552,103 +531,65 @@ elif page == "Invitations":
     with col1:
         st.metric("Total Clients", total_clients)
     with col2:
-        st.metric("RSVP Links Generated", links_generated)
+        st.metric("RSVP'd So Far", responded)
     with col3:
         st.metric("Marked as Sent", sent_count)
 
+    st.info(
+        "This is the same link for every client — paste it into your Outlook invitation "
+        "email body and onto the invitation card (as text or a QR code). Each client fills "
+        "in their own email, name, company, and attendance status; responses land in the "
+        "RSVP Tracker automatically."
+    )
+    st.code(shared_link, language=None)
+
     st.divider()
-    st.subheader("Generate RSVP Links")
+    st.subheader("Mark Invitations as Sent")
 
     if total_clients == 0:
         st.info("No clients have been imported yet. Go to Clients first.")
-    else:
-        if st.button("Generate Missing RSVP Links", type="primary", key="generate_links"):
-            connection = get_connection()
-            clients = connection.execute(
-                "SELECT id FROM clients WHERE rsvp_token IS NULL OR rsvp_token = ''"
-            ).fetchall()
-            generated = 0
-
-            for client in clients:
-                connection.execute(
-                    """
-                    UPDATE clients
-                    SET rsvp_token = ?, token_created_at = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        generate_rsvp_token(),
-                        datetime.now().isoformat(timespec="seconds"),
-                        client[0],
-                    ),
-                )
-                generated += 1
-
-            connection.commit()
-            connection.close()
-            st.success(f"{generated} RSVP links generated successfully.")
-            st.rerun()
+    elif st.button("Mark All Clients as Invitation Sent", type="primary", key="mark_all_sent"):
+        connection = get_connection()
+        connection.execute("UPDATE clients SET invitation_sent = 1")
+        connection.commit()
+        connection.close()
+        st.success("All clients have been marked as Invitation Sent.")
+        st.rerun()
 
     st.divider()
-    st.subheader("Invitation Preparation")
+    st.subheader("Client List for Outlook")
     st.info(
-        "You will continue sending the actual emails from your Wilhelmsen Outlook account. "
-        "This page prepares each client's unique RSVP link."
+        "Export this list to build your BCC list or mail-merge in Outlook. "
+        "Every recipient uses the same RSVP link above."
     )
 
     connection = get_connection()
-    links_df = pd.read_sql_query(
+    contact_df = pd.read_sql_query(
         """
         SELECT
-            id AS "Client ID",
             company AS "Company",
             contact_name AS "Contact Name",
             email AS "Email",
             rsvp_status AS "RSVP Status",
-            invitation_sent AS "Invitation Sent",
-            rsvp_token AS "RSVP Token"
+            invitation_sent AS "Invitation Sent"
         FROM clients
-        WHERE rsvp_token IS NOT NULL AND rsvp_token != ''
         ORDER BY company, contact_name
         """,
         connection,
     )
     connection.close()
 
-    if links_df.empty:
-        st.info("No RSVP links have been generated yet.")
+    if contact_df.empty:
+        st.info("No clients have been imported yet.")
     else:
-        links_df["RSVP Link"] = (
-            base_url.rstrip("/") + "/?rsvp=" + links_df["RSVP Token"]
-        )
-
-        email_list = links_df[
-            ["Company", "Contact Name", "Email", "RSVP Link", "RSVP Status", "Invitation Sent"]
-        ].copy()
-
-        st.dataframe(email_list, use_container_width=True, hide_index=True)
-
+        st.dataframe(contact_df, use_container_width=True, hide_index=True)
         st.download_button(
             "Export Outlook Invitation List",
-            data=email_list.to_csv(index=False).encode("utf-8"),
+            data=contact_df.to_csv(index=False).encode("utf-8"),
             file_name="Client_Connect_2026_Outlook_Invitation_List.csv",
             mime="text/csv",
             key="export_invitation_list",
         )
-
-        if st.button("Mark All Generated Links as Invitation Sent", key="mark_all_sent"):
-            connection = get_connection()
-            connection.execute(
-                """
-                UPDATE clients
-                SET invitation_sent = 1
-                WHERE rsvp_token IS NOT NULL AND rsvp_token != ''
-                """
-            )
-            connection.commit()
-            connection.close()
-            st.success("All generated-link clients have been marked as Invitation Sent.")
-            st.rerun()
 
 
 # ============================================================
@@ -676,8 +617,9 @@ elif page == "RSVP Tracker":
             CASE rsvp_status
                 WHEN 'Pending' THEN 1
                 WHEN 'Accepted' THEN 2
-                WHEN 'Declined' THEN 3
-                ELSE 4
+                WHEN 'Tentative' THEN 3
+                WHEN 'Declined' THEN 4
+                ELSE 5
             END,
             company
         """,
@@ -688,7 +630,7 @@ elif page == "RSVP Tracker":
     if tracker_df.empty:
         st.info("No clients have been imported yet.")
     else:
-        status = st.selectbox("Show", ["All", "Pending", "Accepted", "Declined"], key="tracker_status")
+        status = st.selectbox("Show", ["All", "Pending", "Accepted", "Tentative", "Declined"], key="tracker_status")
         filtered = tracker_df if status == "All" else tracker_df[tracker_df["RSVP Status"] == status]
         st.dataframe(filtered, use_container_width=True, hide_index=True)
         st.download_button(
@@ -834,6 +776,7 @@ elif page == "Reports":
             COUNT(*) AS total,
             SUM(CASE WHEN rsvp_status = 'Accepted' THEN 1 ELSE 0 END),
             SUM(CASE WHEN rsvp_status = 'Declined' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN rsvp_status = 'Tentative' THEN 1 ELSE 0 END),
             SUM(CASE WHEN rsvp_status = 'Pending' THEN 1 ELSE 0 END),
             COALESCE(SUM(CASE WHEN rsvp_status = 'Accepted' THEN attendees ELSE 0 END), 0),
             SUM(CASE WHEN checked_in = 1 THEN 1 ELSE 0 END)
@@ -842,7 +785,7 @@ elif page == "Reports":
     ).fetchone()
     connection.close()
 
-    total, accepted, declined, pending, expected, checked_in = summary
+    total, accepted, declined, tentative, pending, expected, checked_in = summary
 
     columns = st.columns(3)
     for column, title, value in zip(
@@ -859,6 +802,7 @@ elif page == "Reports":
                 "Invited",
                 "Accepted",
                 "Declined",
+                "Tentative",
                 "Pending",
                 "Expected Attendees",
                 "Checked In",
@@ -867,6 +811,7 @@ elif page == "Reports":
                 total or 0,
                 accepted or 0,
                 declined or 0,
+                tentative or 0,
                 pending or 0,
                 expected or 0,
                 checked_in or 0,
