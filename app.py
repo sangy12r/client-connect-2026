@@ -315,8 +315,7 @@ if page == "Dashboard":
             f"Date: {EVENT_DATE}\n\n"
             f"Time: {EVENT_TIME}\n\n"
             f"Venue: {EVENT_VENUE}\n\n"
-            f"RSVP deadline: {RSVP_DEADLINE}\n\n"
-            f"RSVP links generated: {links_generated}"
+            f"RSVP deadline: {RSVP_DEADLINE}"
         )
 
 
