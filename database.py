@@ -45,16 +45,42 @@ def initialize_database():
         """
     )
 
-    existing_columns = [
+    # Every column the app expects the "clients" table to have, with the
+    # SQL type used to add it if it's ever missing (e.g. because the table
+    # was created by an older version of this schema). This makes the
+    # migration self-healing for ANY column, not just specific ones we
+    # remember to list - if a future column gets added to the CREATE TABLE
+    # above, add it here too and it will auto-migrate on existing tables.
+    expected_columns = {
+        "company": "TEXT NOT NULL DEFAULT ''",
+        "contact_name": "TEXT NOT NULL DEFAULT ''",
+        "designation": "TEXT",
+        "email": "TEXT",
+        "mobile": "TEXT",
+        "category": "TEXT",
+        "priority": "TEXT DEFAULT 'Normal'",
+        "rsvp_status": "TEXT DEFAULT 'Pending'",
+        "attendees": "INTEGER DEFAULT 0",
+        "guest_name": "TEXT",
+        "rsvp_date": "TEXT",
+        "invitation_sent": "INTEGER DEFAULT 0",
+        "invitation_opened": "INTEGER DEFAULT 0",
+        "checked_in": "INTEGER DEFAULT 0",
+        "check_in_time": "TEXT",
+        "rsvp_token": "TEXT",
+        "token_created_at": "TEXT",
+    }
+
+    existing_columns = {
         row[1]
         for row in cursor.execute("PRAGMA table_info(clients)").fetchall()
-    ]
+    }
 
-    if "rsvp_token" not in existing_columns:
-        cursor.execute("ALTER TABLE clients ADD COLUMN rsvp_token TEXT")
-
-    if "token_created_at" not in existing_columns:
-        cursor.execute("ALTER TABLE clients ADD COLUMN token_created_at TEXT")
+    for column_name, column_type in expected_columns.items():
+        if column_name not in existing_columns:
+            cursor.execute(
+                f"ALTER TABLE clients ADD COLUMN {column_name} {column_type}"
+            )
 
     connection.commit()
     connection.close()
