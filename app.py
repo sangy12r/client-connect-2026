@@ -126,11 +126,10 @@ elif page=="Clients":
                     except sqlite3.IntegrityError: pass
                 c.commit(); c.close(); st.success(f"{imported} clients imported."); st.rerun()
     c=get_connection(); df=pd.read_sql_query('SELECT company AS "Company",contact_name AS "Contact Name",designation AS "Designation",email AS "Email",rsvp_status AS "RSVP Status",invitation_sent AS "Invitation Sent",checked_in AS "Checked In" FROM clients ORDER BY company,contact_name',c); c.close()
-if not df.empty:
-    st.dataframe(df, use_container_width=True, hide_index=True)
-else:
-    st.success("No pending RSVPs.")
-    st.download_button("Export Client List",df.to_csv(index=False).encode(),"Client_Connect_2026_Client_List.csv","text/csv")
+
+st.dataframe(df, use_container_width=True, hide_index=True)
+
+st.download_button("Export Client List",df.to_csv(index=False).encode(),"Client_Connect_2026_Client_List.csv","text/csv")
 
 elif page=="Invitations":
     st.markdown('<div class="section-title">Invitation Management</div>',unsafe_allow_html=True)
