@@ -154,7 +154,10 @@ elif page=="Follow-ups":
     st.markdown('<div class="section-title">Follow-ups</div>',unsafe_allow_html=True)
     c=get_connection(); df=pd.read_sql_query('SELECT company AS "Company",contact_name AS "Contact Name",email AS "Email",priority AS "Priority",invitation_sent AS "Invitation Sent" FROM clients WHERE rsvp_status="Pending" ORDER BY company',c); c.close()
     st.metric("Pending RSVPs",len(df))
-    st.dataframe(df,use_container_width=True,hide_index=True) if not df.empty else st.success("No pending RSVPs.")
+    if not df.empty:
+        st.dataframe(df, use_container_width=True, hide_index=True)
+    else:
+        st.success("No pending RSVPs.")
     if not df.empty: st.download_button("Export Follow-up List",df.to_csv(index=False).encode(),"Client_Connect_2026_Follow_Up_List.csv","text/csv")
 
 elif page=="Event Check-in":
