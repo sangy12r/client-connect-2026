@@ -1,18 +1,10 @@
 import sqlite3
 from datetime import datetime
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from database import initialize_database, generate_rsvp_token
-
-
-DATABASE_PATH = Path(__file__).parent / "client_connect.db"
-
-
-def get_connection():
-    return sqlite3.connect(DATABASE_PATH)
+from database import initialize_database, generate_rsvp_token, get_connection
 
 
 initialize_database()
