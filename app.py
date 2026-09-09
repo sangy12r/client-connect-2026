@@ -510,8 +510,8 @@ elif page == "Invitations":
     st.subheader("Shared RSVP Link")
     base_url = st.text_input(
         "Application URL",
-        value="http://localhost:8501",
-        help="Use localhost while testing. Replace it with the public HTTPS URL after deployment.",
+        value="https://wps-client-connect-2026.streamlit.app",
+        help="This is your live app's public URL. Only change this if your deployed URL ever changes.",
     )
 
     shared_link = base_url.rstrip("/") + "/?rsvp=1"
