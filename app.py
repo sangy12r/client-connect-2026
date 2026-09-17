@@ -6,9 +6,21 @@ import pandas as pd
 import streamlit as st
 
 from database import initialize_database, get_connection
+from mailer import send_rsvp_emails, get_organiser_email, email_is_configured
 
-
-initialize_database()
+try:
+    initialize_database()
+except KeyError:
+    st.set_page_config(page_title="Client Connect 2026", page_icon="🔗")
+    st.error(
+        "Database connection is not configured yet. Add a `DATABASE_URL` secret "
+        "in Streamlit Cloud under Manage app → Settings → Secrets, then reboot the app."
+    )
+    st.stop()
+except Exception as exc:
+    st.set_page_config(page_title="Client Connect 2026", page_icon="🔗")
+    st.error(f"Could not connect to the database. Check your DATABASE_URL secret. ({exc})")
+    st.stop()
 
 st.set_page_config(
     page_title="Client Connect 2026",
@@ -88,7 +100,13 @@ if show_rsvp_page:
     )
 
     if st.session_state.get("rsvp_saved"):
-        st.success("Thank you. Your RSVP has been recorded successfully.")
+        if email_is_configured():
+            st.success(
+                "Thank you. Your RSVP has been recorded successfully. "
+                "A confirmation email is on its way to you."
+            )
+        else:
+            st.success("Thank you. Your RSVP has been recorded successfully.")
         st.session_state["rsvp_saved"] = False
 
     email = st.text_input("Email ID", placeholder="Enter your email ID")
@@ -143,22 +161,48 @@ if show_rsvp_page:
                     """
                     INSERT INTO clients
                         (company, contact_name, email, rsvp_status, attendees,
-                         rsvp_date, invitation_sent, invitation_opened)
-                    VALUES (?, ?, ?, ?, ?, ?, 1, 1)
+                         rsvp_date, invitation_sent, invitation_opened, source)
+                    VALUES (?, ?, ?, ?, ?, ?, 1, 1, 'Online (Unverified)')
                     """,
                     (company_clean, name_clean, email_clean, new_status, attendees, now),
                 )
 
             connection.commit()
             connection.close()
+
+            # The RSVP is now safely saved. Email is attempted afterwards and
+            # is never allowed to interrupt or undo the save.
+            send_rsvp_emails(
+                client_email=email_clean,
+                name=name_clean,
+                company=company_clean,
+                response_label=new_status,
+                is_known_client=bool(existing),
+                event_details={
+                    "name": EVENT_NAME,
+                    "date": EVENT_DATE,
+                    "time": EVENT_TIME,
+                    "venue": EVENT_VENUE,
+                },
+            )
+
             st.session_state["rsvp_saved"] = True
             st.rerun()
 
+    organiser_email = get_organiser_email()
+    if organiser_email:
+        contact_line = (
+            f'For any changes or questions, please contact '
+            f'<a href="mailto:{organiser_email}">{organiser_email}</a>.'
+        )
+    else:
+        contact_line = "For any changes or questions, please contact the event organiser."
+
     st.markdown(
-        """
+        f"""
             </div>
             <div class="rsvp-footer">
-                For any changes or questions, please contact the event organiser.
+                {contact_line}
             </div>
         </div>
         """,
@@ -266,7 +310,16 @@ if page == "Dashboard":
     invitation_sent = connection.execute(
         "SELECT COUNT(*) FROM clients WHERE invitation_sent = 1"
     ).fetchone()[0]
+    unverified = connection.execute(
+        "SELECT COUNT(*) FROM clients WHERE source = 'Online (Unverified)'"
+    ).fetchone()[0]
     connection.close()
+
+    if unverified > 0:
+        st.warning(
+            f"{unverified} RSVP(s) came from an email not on your imported client list. "
+            f"Open RSVP Tracker and filter by 'Unverified only' to review them."
+        )
 
     columns = st.columns(6)
     for column, (title, value) in zip(
@@ -599,6 +652,92 @@ elif page == "RSVP Tracker":
     st.markdown("<div class='section-title'>RSVP Tracker</div>", unsafe_allow_html=True)
     st.write("Monitor responses and attendee counts in one place.")
 
+    # ---- Manual RSVP entry (phone / WhatsApp / verbal confirmations) ----
+    with st.expander("Record an RSVP manually", expanded=False):
+        st.caption(
+            "Use this when a client confirms by phone, WhatsApp, or in person instead "
+            "of using the link. If the email already exists, their record is updated."
+        )
+
+        connection = get_connection()
+        client_rows = connection.execute(
+            "SELECT email, contact_name, company FROM clients ORDER BY company, contact_name"
+        ).fetchall()
+        connection.close()
+
+        choices = ["-- New person (not on my list) --"] + [
+            f"{row[1]} · {row[2]} · {row[0]}" for row in client_rows
+        ]
+        picked = st.selectbox("Select client", choices, key="manual_pick")
+
+        if picked == "-- New person (not on my list) --":
+            m_email = st.text_input("Email ID", key="manual_email")
+            m_name = st.text_input("Name", key="manual_name")
+            m_company = st.text_input("Company", key="manual_company")
+        else:
+            row = client_rows[choices.index(picked) - 1]
+            m_email, m_name, m_company = row[0], row[1], row[2]
+            st.info(f"Recording for: {m_name} · {m_company} · {m_email}")
+
+        m_response = st.radio(
+            "Response", ["Accepted", "Tentative", "Declined"], horizontal=True, key="manual_response"
+        )
+        m_attendees = st.number_input(
+            "Number attending", min_value=0, max_value=10,
+            value=1 if m_response == "Accepted" else 0, step=1, key="manual_attendees",
+        )
+        m_channel = st.selectbox(
+            "How did they confirm?", ["Phone", "WhatsApp", "Email", "In person", "Other"],
+            key="manual_channel",
+        )
+
+        if st.button("Save Manual RSVP", type="primary", key="manual_save"):
+            m_email_clean = (m_email or "").strip().lower()
+            m_name_clean = (m_name or "").strip()
+            m_company_clean = (m_company or "").strip()
+
+            if not m_email_clean or not EMAIL_PATTERN.match(m_email_clean):
+                st.error("Please enter a valid email ID.")
+            elif not m_name_clean:
+                st.error("Please enter a name.")
+            elif not m_company_clean:
+                st.error("Please enter a company.")
+            else:
+                now = datetime.now().isoformat(timespec="seconds")
+                source_label = f"Manual ({m_channel})"
+                connection = get_connection()
+                exists = connection.execute(
+                    "SELECT id FROM clients WHERE email = ?", (m_email_clean,)
+                ).fetchone()
+
+                if exists:
+                    connection.execute(
+                        """
+                        UPDATE clients
+                        SET company = ?, contact_name = ?, rsvp_status = ?,
+                            attendees = ?, rsvp_date = ?, source = ?
+                        WHERE email = ?
+                        """,
+                        (m_company_clean, m_name_clean, m_response, int(m_attendees),
+                         now, source_label, m_email_clean),
+                    )
+                else:
+                    connection.execute(
+                        """
+                        INSERT INTO clients
+                            (company, contact_name, email, rsvp_status, attendees,
+                             rsvp_date, invitation_sent, invitation_opened, source)
+                        VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)
+                        """,
+                        (m_company_clean, m_name_clean, m_email_clean, m_response,
+                         int(m_attendees), now, source_label),
+                    )
+
+                connection.commit()
+                connection.close()
+                st.success(f"RSVP recorded for {m_name_clean} ({m_response}).")
+                st.rerun()
+
     connection = get_connection()
     tracker_df = pd.read_sql_query(
         """
@@ -610,7 +749,8 @@ elif page == "RSVP Tracker":
             rsvp_status AS "RSVP Status",
             attendees AS "Attendees",
             guest_name AS "Guest Name",
-            rsvp_date AS "RSVP Date"
+            rsvp_date AS "RSVP Date",
+            source AS "Source"
         FROM clients
         ORDER BY
             CASE rsvp_status
@@ -629,8 +769,23 @@ elif page == "RSVP Tracker":
     if tracker_df.empty:
         st.info("No clients have been imported yet.")
     else:
-        status = st.selectbox("Show", ["All", "Pending", "Accepted", "Tentative", "Declined"], key="tracker_status")
-        filtered = tracker_df if status == "All" else tracker_df[tracker_df["RSVP Status"] == status]
+        unverified_count = (tracker_df["Source"] == "Online (Unverified)").sum()
+        if unverified_count > 0:
+            st.warning(
+                f"{unverified_count} RSVP(s) came from an email that wasn't on your imported "
+                f"client list. Worth a quick check before finalising headcount — filter by "
+                f"'Unverified only' below to review them."
+            )
+
+        status = st.selectbox(
+            "Show", ["All", "Pending", "Accepted", "Tentative", "Declined", "Unverified only"], key="tracker_status"
+        )
+        if status == "Unverified only":
+            filtered = tracker_df[tracker_df["Source"] == "Online (Unverified)"]
+        elif status == "All":
+            filtered = tracker_df
+        else:
+            filtered = tracker_df[tracker_df["RSVP Status"] == status]
         st.dataframe(filtered, use_container_width=True, hide_index=True)
         st.download_button(
             "Export RSVP Tracker",
