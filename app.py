@@ -33,7 +33,12 @@ EVENT_NAME = "Client Connect 2026"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
 EVENT_DATE = "Friday, 23 October 2026"
 EVENT_TIME = "6:00 PM onwards"
-EVENT_VENUE = "To be announced"
+EVENT_VENUE = "Butterfly High, BKC"
+EVENT_VENUE_ADDRESS = (
+    "Unit no. 4, Ground Floor, Jet Airways, Godrej BKC, Next to MCA Bandra Club, "
+    "G Block BKC, Bandra Kurla Complex, Bandra East, Mumbai, Maharashtra 400051"
+)
+EVENT_VENUE_MAP_URL = "https://maps.app.goo.gl/D6bCUHX5QDkFe6mM7"
 RSVP_DEADLINE = "Friday, 16 October 2026"
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -92,7 +97,10 @@ if show_rsvp_page:
                 <div class="event-info">
                     <strong>Date</strong><br>{EVENT_DATE}<br><br>
                     <strong>Time</strong><br>{EVENT_TIME}<br><br>
-                    <strong>Venue</strong><br>{EVENT_VENUE}<br><br>
+                    <strong>Venue</strong><br>
+                    <a href="{EVENT_VENUE_MAP_URL}" target="_blank">{EVENT_VENUE}</a><br>
+                    <span style="font-size: 0.85rem; color: #667085;">{EVENT_VENUE_ADDRESS}</span>
+                    <br><br>
                     <strong>RSVP by</strong><br>{RSVP_DEADLINE}
                 </div>
         """,
@@ -287,7 +295,7 @@ with st.sidebar:
     st.caption("Event")
     st.write("23 October 2026")
     st.write("6:00 PM onwards")
-    st.write("Venue: To be announced")
+    st.markdown(f"Venue: [{EVENT_VENUE}]({EVENT_VENUE_MAP_URL})")
 
 
 # ============================================================
@@ -367,7 +375,8 @@ if page == "Dashboard":
         st.info(
             f"Date: {EVENT_DATE}\n\n"
             f"Time: {EVENT_TIME}\n\n"
-            f"Venue: {EVENT_VENUE}\n\n"
+            f"Venue: [{EVENT_VENUE}]({EVENT_VENUE_MAP_URL})  \n"
+            f"{EVENT_VENUE_ADDRESS}\n\n"
             f"RSVP deadline: {RSVP_DEADLINE}"
         )
 
@@ -557,7 +566,7 @@ elif page == "Invitations":
         st.write(EVENT_TIME)
     with col3:
         st.write("Venue")
-        st.write(EVENT_VENUE)
+        st.markdown(f"[{EVENT_VENUE}]({EVENT_VENUE_MAP_URL})")
 
     st.divider()
     st.subheader("Shared RSVP Link")
