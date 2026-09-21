@@ -38,7 +38,7 @@ EVENT_VENUE_ADDRESS = (
     "Unit no. 4, Ground Floor, Jet Airways, Godrej BKC, Next to MCA Bandra Club, "
     "G Block BKC, Bandra Kurla Complex, Bandra East, Mumbai, Maharashtra 400051"
 )
-EVENT_VENUE_MAP_URL = "https://maps.app.goo.gl/D6bCUHX5QDkFe6mM7"
+EVENT_VENUE_MAP_URL = "https://maps.app.goo.gl/HAn9RAzTzKeKRr277"
 RSVP_DEADLINE = "Friday, 16 October 2026"
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
