@@ -1,5 +1,4 @@
 import re
-import sqlite3
 from datetime import datetime
 
 import pandas as pd
@@ -497,11 +496,17 @@ elif page == "Clients":
                             """,
                             (company, contact_name, designation, email, mobile, category, priority),
                         )
+                        connection.commit()
                         imported += 1
-                    except sqlite3.IntegrityError:
+                    except Exception:
+                        # Covers sqlite3.IntegrityError and psycopg2's
+                        # UniqueViolation alike - both mean this email is
+                        # already in the table. Roll back just this one
+                        # row's failed attempt so it doesn't undo any
+                        # earlier successful imports still waiting to commit.
+                        connection.rollback()
                         duplicates += 1
 
-                connection.commit()
                 connection.close()
 
                 st.success(f"{imported} clients imported successfully.")
