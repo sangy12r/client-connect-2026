@@ -1,20 +1,71 @@
-import sqlite3
-import tempfile
-from pathlib import Path
 import secrets
 
+import psycopg2
+import streamlit as st
 
-# Streamlit Community Cloud's app source folder isn't reliably writable at
-# runtime. Use the system temp directory instead so the database can always
-# be created without any external setup. Note: this is temporary/ephemeral
-# storage - data resets whenever the app reboots/redeploys/sleeps. This is
-# a stand-in while Supabase approval is pending; switch get_connection()
-# back to Postgres once that's ready for real client data.
-DATABASE_PATH = Path(tempfile.gettempdir()) / "client_connect.db"
+
+class _PGCursorWrapper:
+    """Makes a psycopg2 cursor behave like sqlite3's: supports the same
+    .execute(sql, params).fetchone()/.fetchall() chaining, and translates
+    sqlite-style "?" placeholders to psycopg2-style "%s" automatically so
+    none of the existing SQL strings elsewhere in the app need to change."""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, sql, params=None):
+        translated_sql = sql.replace("?", "%s")
+        self._cursor.execute(translated_sql, params or ())
+        return self
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    @property
+    def description(self):
+        return self._cursor.description
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+    def close(self):
+        self._cursor.close()
+
+
+class _PGConnectionWrapper:
+    """Makes a psycopg2 connection behave like sqlite3's Connection object:
+    connection.execute(sql, params) works directly, and connection.cursor()
+    works for pandas' read_sql_query()."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql, params=None):
+        cursor = self._conn.cursor()
+        return _PGCursorWrapper(cursor).execute(sql, params)
+
+    def cursor(self):
+        return _PGCursorWrapper(self._conn.cursor())
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+    def rollback(self):
+        self._conn.rollback()
 
 
 def get_connection():
-    return sqlite3.connect(DATABASE_PATH)
+    return _PGConnectionWrapper(psycopg2.connect(st.secrets["DATABASE_URL"]))
 
 
 def initialize_database():
@@ -24,9 +75,9 @@ def initialize_database():
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS clients (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company TEXT NOT NULL,
-            contact_name TEXT NOT NULL,
+            id SERIAL PRIMARY KEY,
+            company TEXT NOT NULL DEFAULT '',
+            contact_name TEXT NOT NULL DEFAULT '',
             designation TEXT,
             email TEXT NOT NULL UNIQUE,
             mobile TEXT,
@@ -47,10 +98,6 @@ def initialize_database():
         """
     )
 
-    # Every column the app expects the "clients" table to have, with the
-    # SQL type used to add it if it's ever missing (e.g. from an older
-    # version of this schema). Self-healing for ANY column - if a future
-    # column gets added to the CREATE TABLE above, add it here too.
     expected_columns = {
         "company": "TEXT NOT NULL DEFAULT ''",
         "contact_name": "TEXT NOT NULL DEFAULT ''",
@@ -71,16 +118,14 @@ def initialize_database():
         "source": "TEXT DEFAULT 'Imported'",
     }
 
-    existing_columns = {
-        row[1]
-        for row in cursor.execute("PRAGMA table_info(clients)").fetchall()
-    }
+    cursor.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'clients'"
+    )
+    existing_columns = {row[0] for row in cursor.fetchall()}
 
     for column_name, column_type in expected_columns.items():
         if column_name not in existing_columns:
-            cursor.execute(
-                f"ALTER TABLE clients ADD COLUMN {column_name} {column_type}"
-            )
+            cursor.execute(f"ALTER TABLE clients ADD COLUMN {column_name} {column_type}")
 
     connection.commit()
     connection.close()
