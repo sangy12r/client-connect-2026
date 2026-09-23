@@ -38,7 +38,7 @@ EVENT_VENUE_ADDRESS = (
     "Unit no. 4, Ground Floor, Jet Airways, Godrej BKC, Next to MCA Bandra Club, "
     "G Block BKC, Bandra Kurla Complex, Bandra East, Mumbai, Maharashtra 400051"
 )
-EVENT_VENUE_MAP_URL = "https://maps.app.goo.gl/HAn9RAzTzKeKRr277"
+EVENT_VENUE_MAP_URL = "https://maps.app.goo.gl/D6bCUHX5QDkFe6mM7"
 RSVP_DEADLINE = "Friday, 16 October 2026"
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -216,6 +216,33 @@ if show_rsvp_page:
         """,
         unsafe_allow_html=True,
     )
+    st.stop()
+
+
+# ============================================================
+# ADMIN LOGIN
+# ============================================================
+# Everything below this line is internal - client list, RSVP data, reports.
+# The RSVP page above already returned via st.stop(), so anyone without the
+# admin password never reaches any of this, regardless of which URL they land on.
+
+if not st.session_state.get("admin_authenticated"):
+    st.markdown("### Client Connect 2026 — Admin Login")
+    entered_password = st.text_input("Password", type="password", key="admin_password_input")
+    if st.button("Log in", type="primary"):
+        try:
+            correct_password = st.secrets["ADMIN_PASSWORD"]
+        except (KeyError, FileNotFoundError):
+            st.error(
+                "Admin password is not configured yet. Add an `ADMIN_PASSWORD` "
+                "secret in Streamlit Cloud under Manage app → Settings → Secrets."
+            )
+            st.stop()
+        if entered_password == correct_password:
+            st.session_state["admin_authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Incorrect password.")
     st.stop()
 
 
