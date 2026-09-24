@@ -41,13 +41,13 @@ except Exception as exc:
     st.stop()
 
 st.set_page_config(
-    page_title="Client Connect 2026",
+    page_title="Sunset Social - 2026",
     page_icon="🔗",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-EVENT_NAME = "Client Connect 2026"
+EVENT_NAME = "Sunset Social - 2026"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
 EVENT_DATE = "Friday, 23 October 2026"
 EVENT_TIME = "6:00 PM onwards"
