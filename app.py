@@ -229,7 +229,7 @@ if show_rsvp_page:
             f'<a href="mailto:{organiser_email}">{organiser_email}</a>.'
         )
     else:
-        contact_line = "For any changes or questions, please contact the event organiser."
+        contact_line = "For any questions, please contact the event organiser."
 
     st.markdown(
         f"""
