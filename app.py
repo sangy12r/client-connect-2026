@@ -79,7 +79,8 @@ if show_rsvp_page:
             border-radius: 20px;
             color: white;
             text-align: center;
-            margin-bottom: 22px;
+            margin: 0 auto 22px auto;
+            width: 90%;
         }
         .rsvp-header h1 { margin: 0 0 8px 0; font-size: 2.3rem; }
         .rsvp-header p { margin: 0; font-size: 1rem; }
@@ -104,14 +105,14 @@ if show_rsvp_page:
     )
 
     logo_html = (
-        f'<img src="{LOGO_DATA_URI}" style="max-width: 260px; margin-bottom: 18px;">'
+        f'<img src="{LOGO_DATA_URI}" style="max-width: 340px; margin-bottom: 18px;">'
         if LOGO_DATA_URI else ""
     )
 
     st.markdown(
         f"""
         <div class="rsvp-page">
-            <div style="text-align: center;">{logo_html}</div>
+            <div style="text-align: left; width: 90%; margin: 0 auto;">{logo_html}</div>
             <div class="rsvp-header">
                 <h1>{EVENT_NAME}</h1>
                 <p>{EVENT_SUBTITLE}</p>
@@ -285,7 +286,8 @@ st.markdown(
         padding: 25px 32px;
         border-radius: 18px;
         color: white;
-        margin-bottom: 25px;
+        margin: 0 auto 25px auto;
+        width: 90%;
     }
     .app-header h1 { margin: 0; font-size: 2rem; font-weight: 700; }
     .app-header p { margin: 7px 0 0 0; font-size: .95rem; opacity: .9; }
@@ -311,7 +313,7 @@ st.markdown(
 
 if LOGO_DATA_URI:
     st.markdown(
-        f'<div style="text-align: center;"><img src="{LOGO_DATA_URI}" style="max-width: 220px; margin-bottom: 10px;"></div>',
+        f'<div style="text-align: left; width: 90%; margin: 0 auto;"><img src="{LOGO_DATA_URI}" style="max-width: 280px; margin-bottom: 10px;"></div>',
         unsafe_allow_html=True,
     )
 
