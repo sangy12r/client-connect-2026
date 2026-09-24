@@ -29,7 +29,7 @@ LOGO_DATA_URI = _load_logo_base64()
 try:
     initialize_database()
 except KeyError:
-    st.set_page_config(page_title="Client Connect 2026", page_icon="🔗")
+    st.set_page_config(page_title="Sunset Social Event 2026", page_icon="🔗")
     st.error(
         "Database connection is not configured yet. Add a `DATABASE_URL` secret "
         "in Streamlit Cloud under Manage app → Settings → Secrets, then reboot the app."
