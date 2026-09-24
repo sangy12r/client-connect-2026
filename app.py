@@ -1,11 +1,30 @@
+import base64
 import re
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 from database import initialize_database, get_connection
 from mailer import send_rsvp_emails, get_organiser_email, email_is_configured
+
+
+def _load_logo_base64():
+    """Reads logo.png from the app folder and returns it as a base64 data
+    URI for embedding in HTML. Returns None if the file isn't there, so a
+    missing logo never breaks the page - it just doesn't show one."""
+    logo_path = Path(__file__).parent / "logo.png"
+    try:
+        data = logo_path.read_bytes()
+        encoded = base64.b64encode(data).decode("utf-8")
+        return f"data:image/png;base64,{encoded}"
+    except FileNotFoundError:
+        return None
+
+
+LOGO_DATA_URI = _load_logo_base64()
+
 
 try:
     initialize_database()
@@ -84,9 +103,15 @@ if show_rsvp_page:
         unsafe_allow_html=True,
     )
 
+    logo_html = (
+        f'<img src="{LOGO_DATA_URI}" style="max-width: 260px; margin-bottom: 18px;">'
+        if LOGO_DATA_URI else ""
+    )
+
     st.markdown(
         f"""
         <div class="rsvp-page">
+            <div style="text-align: center;">{logo_html}</div>
             <div class="rsvp-header">
                 <h1>{EVENT_NAME}</h1>
                 <p>{EVENT_SUBTITLE}</p>
@@ -283,6 +308,12 @@ st.markdown(
 # ============================================================
 # HEADER
 # ============================================================
+
+if LOGO_DATA_URI:
+    st.markdown(
+        f'<div style="text-align: center;"><img src="{LOGO_DATA_URI}" style="max-width: 220px; margin-bottom: 10px;"></div>',
+        unsafe_allow_html=True,
+    )
 
 st.markdown(
     f"""
