@@ -46,6 +46,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+# Hide Streamlit toolbar/header/menu
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
 EVENT_NAME = "Sunset Social - 2026"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
