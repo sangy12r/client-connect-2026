@@ -556,6 +556,59 @@ elif page == "Clients":
             )
             st.rerun()
 
+    with st.expander("Add a single client", expanded=False):
+        st.caption("Add one or two clients without touching your master Excel file at all.")
+        with st.form("single_client_form", clear_on_submit=True):
+            sc_company = st.text_input("Company")
+            sc_name = st.text_input("Contact Name")
+            sc_email = st.text_input("Email")
+            sc_designation = st.text_input("Designation (optional)")
+            sc_mobile = st.text_input("Mobile (optional)")
+            sc_category = st.text_input("Category (optional)")
+            sc_priority = st.selectbox("Priority", ["Normal", "High", "VIP"])
+            submitted = st.form_submit_button("Add Client", type="primary")
+
+        if submitted:
+            company_clean = sc_company.strip()
+            name_clean = sc_name.strip()
+            email_clean = sc_email.strip().lower()
+
+            if not company_clean or not name_clean or not email_clean or "@" not in email_clean:
+                st.error("Company, Contact Name, and a valid Email are required.")
+            else:
+                connection = get_connection()
+                existing = connection.execute(
+                    "SELECT id FROM clients WHERE email = ?", (email_clean,)
+                ).fetchone()
+                if existing:
+                    connection.execute(
+                        """
+                        UPDATE clients
+                        SET company = ?, contact_name = ?, designation = ?,
+                            mobile = ?, category = ?, priority = ?
+                        WHERE email = ?
+                        """,
+                        (company_clean, name_clean, sc_designation.strip(),
+                         sc_mobile.strip(), sc_category.strip(), sc_priority, email_clean),
+                    )
+                    connection.commit()
+                    connection.close()
+                    st.success(f"{name_clean} already existed - details updated instead.")
+                else:
+                    connection.execute(
+                        """
+                        INSERT INTO clients
+                        (company, contact_name, designation, email, mobile, category, priority)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (company_clean, name_clean, sc_designation.strip(), email_clean,
+                         sc_mobile.strip(), sc_category.strip(), sc_priority),
+                    )
+                    connection.commit()
+                    connection.close()
+                    st.success(f"{name_clean} added.")
+                st.rerun()
+
     st.subheader("Import Clients")
 
     uploaded_file = st.file_uploader(
@@ -789,6 +842,37 @@ elif page == "Invitations":
         st.metric("RSVP'd So Far", responded)
     with col3:
         st.metric("Marked as Sent", sent_count)
+
+    st.divider()
+    st.subheader("Email Setup Check")
+    if not email_is_configured():
+        st.warning(
+            "Email is not fully configured yet - at least one of ORGANISER_EMAIL, SMTP_HOST, "
+            "SMTP_PORT, SMTP_USERNAME, or SMTP_PASSWORD is missing from Streamlit Secrets. "
+            "Check the exact spelling of each key (they're case-sensitive)."
+        )
+    else:
+        st.caption("All five email secrets are present. Send a real test to confirm they actually work.")
+        test_to = st.text_input("Send a test RSVP email to (use your own address)", key="test_email_to")
+        if st.button("Send Test Email", key="send_test_email"):
+            if not test_to.strip():
+                st.error("Enter an email address first.")
+            else:
+                ok, reason = send_rsvp_emails(
+                    client_email=test_to.strip(),
+                    name="Test Client",
+                    company="Test Company",
+                    response_label="Accepted",
+                    is_known_client=True,
+                    event_details={
+                        "name": EVENT_NAME, "date": EVENT_DATE,
+                        "time": EVENT_TIME, "venue": EVENT_VENUE,
+                    },
+                )
+                if ok:
+                    st.success(f"Sent successfully. Check {test_to} and {get_organiser_email()}.")
+                else:
+                    st.error(f"Failed: {reason}")
 
     st.info(
         "This is the same link for every client — paste it into your Outlook invitation "
