@@ -6,11 +6,11 @@ raising - the calling code saves the RSVP either way, so a mail problem can
 never cost you a response.
 
 Required Streamlit secrets to enable sending:
-    ORGANISER_EMAIL = "sangy@example.com"
-    SMTP_HOST       = "smtp.office365.com"
+    ORGANISER_EMAIL = "wpsclientconnect@gmail.com"
+    SMTP_HOST       = "smtp.gmail.com"
     SMTP_PORT       = 587
-    SMTP_USERNAME   = "sangy@example.com"
-    SMTP_PASSWORD   = "your-app-password"
+    SMTP_USERNAME   = "wpsclientconnect@gmail.com"
+    SMTP_PASSWORD   = "pcuwrgnpamivcslf"
 """
 
 import smtplib
