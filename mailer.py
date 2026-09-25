@@ -65,7 +65,7 @@ def _build_client_email(to_address, name, company, response_label, event_details
         f"If you need to change your response, simply open the RSVP link again "
         f"and submit with the same email ID.\n\n"
         f"Warm regards,\n"
-        f"Client Connect Team"
+        f"Wilhelmsen Port Services India Pvt Ltd"
     )
     return message
 
