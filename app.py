@@ -732,19 +732,7 @@ elif page == "Clients":
                 connection.close()
                 st.success("Client deleted.")
                 st.rerun()
-
-        with st.expander("Quick cleanup: remove standard test/dummy clients"):
-            st.caption(
-                "Removes anyone whose email is exactly test1@example.com, test2@example.com, "
-                "or test3@example.com - the sample rows used earlier while testing the app."
-            )
-            if st.button("Remove test1/test2/test3 dummy clients", key="remove_dummy_clients"):
-                connection = get_connection()
-                deleted = 0
-                for dummy_email in ("test1@example.com", "test2@example.com", "test3@example.com"):
-                    result = connection.execute(
-                        "DELETE FROM clients WHERE email = ?", (dummy_email,)
-                    )
+        
                     deleted += result.rowcount
                 connection.commit()
                 connection.close()
