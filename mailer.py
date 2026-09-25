@@ -10,7 +10,7 @@ Required Streamlit secrets to enable sending:
     SMTP_HOST       = "smtp.office365.com"
     SMTP_PORT       = 587
     SMTP_USERNAME   = "sangy@example.com"
-    SMTP_PASSWORD   = "pcuwrgnpamivcslf"
+    SMTP_PASSWORD   = "Your Password"
 """
 
 import smtplib
