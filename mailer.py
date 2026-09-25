@@ -10,7 +10,7 @@ Required Streamlit secrets to enable sending:
     SMTP_HOST       = "smtp.office365.com"
     SMTP_PORT       = 587
     SMTP_USERNAME   = "sangy@example.com"
-    SMTP_PASSWORD   = "Your Password"
+    SMTP_PASSWORD   = "your-app-password"
 """
 
 import smtplib
@@ -21,9 +21,15 @@ import streamlit as st
 
 def _secret(key, default=None):
     try:
-        return st.secrets[key]
+        value = st.secrets[key]
     except (KeyError, FileNotFoundError):
         return default
+    # Strip stray whitespace/newlines - a Gmail App Password pasted with the
+    # spaces Google displays it with (or a trailing newline from copy-paste)
+    # will otherwise be sent verbatim and get rejected by the mail server.
+    if isinstance(value, str):
+        return value.strip()
+    return value
 
 
 def get_organiser_email():
