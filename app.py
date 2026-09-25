@@ -46,13 +46,21 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-st.markdown("""
+
+# Hide Streamlit's built-in menu/header/footer chrome for every viewer, on
+# every page (RSVP and admin alike). Also enforced via [client] toolbarMode
+# in .streamlit/config.toml - this CSS is a belt-and-braces backup for the
+# parts config.toml doesn't cover (the header/footer bars themselves).
+st.markdown(
+    """
     <style>
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 EVENT_NAME = "Client Connect 2026"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
@@ -731,12 +739,6 @@ elif page == "Clients":
                 connection.commit()
                 connection.close()
                 st.success("Client deleted.")
-                st.rerun()
-        
-                    deleted += result.rowcount
-                connection.commit()
-                connection.close()
-                st.success(f"{deleted} dummy client(s) removed.")
                 st.rerun()
 
 
