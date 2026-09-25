@@ -29,7 +29,7 @@ LOGO_DATA_URI = _load_logo_base64()
 try:
     initialize_database()
 except KeyError:
-    st.set_page_config(page_title="Sunset Social Event 2026", page_icon="🔗")
+    st.set_page_config(page_title="Client Connect 2026", page_icon="🔗")
     st.error(
         "Database connection is not configured yet. Add a `DATABASE_URL` secret "
         "in Streamlit Cloud under Manage app → Settings → Secrets, then reboot the app."
@@ -41,12 +41,11 @@ except Exception as exc:
     st.stop()
 
 st.set_page_config(
-    page_title="Sunset Social - 2026",
+    page_title="Client Connect 2026",
     page_icon="🔗",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-# Hide Streamlit toolbar/header/menu
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -55,7 +54,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-EVENT_NAME = "Sunset Social - 2026"
+EVENT_NAME = "Client Connect 2026"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
 EVENT_DATE = "Friday, 23 October 2026"
 EVENT_TIME = "6:00 PM onwards"
@@ -237,7 +236,7 @@ if show_rsvp_page:
             f'<a href="mailto:{organiser_email}">{organiser_email}</a>.'
         )
     else:
-        contact_line = "For any questions, please contact the event organiser."
+        contact_line = "For any changes or questions, please contact the event organiser."
 
     st.markdown(
         f"""
@@ -456,6 +455,99 @@ elif page == "Clients":
     st.markdown("<div class='section-title'>Client Database</div>", unsafe_allow_html=True)
     st.write("Manage your invited clients and prepare the master guest list.")
 
+    with st.expander("Fix duplicate / case-mismatched emails", expanded=False):
+        st.caption(
+            "Email matching used to be case-sensitive, so the same person could end up "
+            "as two separate rows if their email was typed with different capitalization "
+            "(e.g. Harsha.Ravande@... vs harsha.ravande@...). This scans for those, merges "
+            "each group into one row (keeping the real RSVP response if one of them has it), "
+            "and removes the leftover duplicate. Safe to run any time - rows with no "
+            "duplicates are left untouched."
+        )
+        if st.button("Scan and merge duplicates", key="merge_duplicates"):
+            connection = get_connection()
+            all_rows = connection.execute(
+                """
+                SELECT id, company, contact_name, email, rsvp_status, attendees,
+                       guest_name, rsvp_date, invitation_sent, invitation_opened,
+                       checked_in, check_in_time, source
+                FROM clients
+                """
+            ).fetchall()
+            connection.close()
+
+            groups = {}
+            for row in all_rows:
+                key = row[3].strip().lower()
+                groups.setdefault(key, []).append(row)
+
+            merged_count = 0
+            normalized_count = 0
+            connection = get_connection()
+
+            for email_lower, rows in groups.items():
+                if len(rows) == 1:
+                    row = rows[0]
+                    if row[3] != email_lower:
+                        connection.execute(
+                            "UPDATE clients SET email = ? WHERE id = ?", (email_lower, row[0])
+                        )
+                        connection.commit()
+                        normalized_count += 1
+                    continue
+
+                # Multiple rows for the same email (case mismatch). Prefer an
+                # "Imported" row as the one to keep (it's your official master
+                # list entry); if several, keep the lowest id (earliest added).
+                imported_rows = [r for r in rows if r[12] == "Imported"]
+                primary = sorted(imported_rows or rows, key=lambda r: r[0])[0]
+                others = [r for r in rows if r[0] != primary[0]]
+
+                # If any row (primary or duplicate) actually has a real RSVP
+                # response, carry that response onto the surviving row -
+                # never lose a real response to a merge.
+                responded = [r for r in rows if r[4] != "Pending"]
+                rsvp_status = primary[4]
+                attendees = primary[5]
+                guest_name = primary[6]
+                rsvp_date = primary[7]
+                if responded:
+                    latest = sorted(responded, key=lambda r: r[7] or "")[-1]
+                    rsvp_status = latest[4]
+                    attendees = latest[5]
+                    guest_name = latest[6]
+                    rsvp_date = latest[7]
+
+                invitation_sent = 1 if any(r[8] for r in rows) else 0
+                invitation_opened = 1 if any(r[9] for r in rows) else 0
+                checked_in = 1 if any(r[10] for r in rows) else 0
+                check_in_time = next((r[11] for r in rows if r[11]), None)
+
+                for dup in others:
+                    connection.execute("DELETE FROM clients WHERE id = ?", (dup[0],))
+                    connection.commit()
+
+                connection.execute(
+                    """
+                    UPDATE clients
+                    SET email = ?, rsvp_status = ?, attendees = ?, guest_name = ?,
+                        rsvp_date = ?, invitation_sent = ?, invitation_opened = ?,
+                        checked_in = ?, check_in_time = ?
+                    WHERE id = ?
+                    """,
+                    (email_lower, rsvp_status, attendees, guest_name, rsvp_date,
+                     invitation_sent, invitation_opened, checked_in, check_in_time, primary[0]),
+                )
+                connection.commit()
+                merged_count += 1
+
+            connection.close()
+            st.success(
+                f"Done. {merged_count} duplicate group(s) merged, "
+                f"{normalized_count} email(s) normalized to lowercase."
+            )
+            st.rerun()
+
     st.subheader("Import Clients")
 
     uploaded_file = st.file_uploader(
@@ -619,6 +711,45 @@ elif page == "Clients":
             mime="text/csv",
             key="export_clients",
         )
+
+        st.divider()
+        st.subheader("Remove a Client")
+        st.caption("Use this to remove test/dummy entries or anyone added by mistake. This cannot be undone.")
+
+        delete_options = ["-- Select a client --"] + [
+            f"{r['Contact Name']} · {r['Company']} · {r['Email']} (ID {r['Client ID']})"
+            for _, r in clients_df.iterrows()
+        ]
+        delete_pick = st.selectbox("Client to remove", delete_options, key="delete_client_pick")
+
+        if delete_pick != "-- Select a client --":
+            delete_id = int(delete_pick.split("(ID ")[-1].rstrip(")"))
+            confirm = st.checkbox(f"Yes, I want to permanently delete: {delete_pick}", key="delete_confirm")
+            if st.button("Delete Client", type="primary", key="delete_client_btn", disabled=not confirm):
+                connection = get_connection()
+                connection.execute("DELETE FROM clients WHERE id = ?", (delete_id,))
+                connection.commit()
+                connection.close()
+                st.success("Client deleted.")
+                st.rerun()
+
+        with st.expander("Quick cleanup: remove standard test/dummy clients"):
+            st.caption(
+                "Removes anyone whose email is exactly test1@example.com, test2@example.com, "
+                "or test3@example.com - the sample rows used earlier while testing the app."
+            )
+            if st.button("Remove test1/test2/test3 dummy clients", key="remove_dummy_clients"):
+                connection = get_connection()
+                deleted = 0
+                for dummy_email in ("test1@example.com", "test2@example.com", "test3@example.com"):
+                    result = connection.execute(
+                        "DELETE FROM clients WHERE email = ?", (dummy_email,)
+                    )
+                    deleted += result.rowcount
+                connection.commit()
+                connection.close()
+                st.success(f"{deleted} dummy client(s) removed.")
+                st.rerun()
 
 
 # ============================================================
