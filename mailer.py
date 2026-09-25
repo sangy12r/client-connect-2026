@@ -126,7 +126,7 @@ def send_rsvp_emails(client_email, name, company, response_label, is_known_clien
 
         return True, "Confirmation emails sent."
 
-    except smtplib.SMTPAuthenticationError:
+    except smtplib.SMTPAuthenticationError as exc:
         smtp_host = (_secret("SMTP_HOST") or "").lower()
         if "gmail" in smtp_host:
             hint = (
@@ -138,7 +138,11 @@ def send_rsvp_emails(client_email, name, company, response_label, is_known_clien
             hint = "If this is a Microsoft 365 account, SMTP AUTH is most likely disabled by IT."
         else:
             hint = "Double-check SMTP_USERNAME and SMTP_PASSWORD are correct for this mail server."
-        return False, f"Mail server rejected the login. {hint}"
+        # Surface Google/Microsoft's actual SMTP response code+message too -
+        # it pinpoints the real cause (bad credentials vs. blocked sign-in
+        # vs. admin policy) instead of us guessing blind.
+        raw = f"{exc.smtp_code} {exc.smtp_error.decode(errors='replace')}"
+        return False, f"Mail server rejected the login. {hint} Raw server response: {raw}"
     except smtplib.SMTPException as exc:
         return False, f"Mail server error: {exc}"
     except Exception as exc:
