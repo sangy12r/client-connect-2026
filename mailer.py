@@ -6,10 +6,10 @@ raising - the calling code saves the RSVP either way, so a mail problem can
 never cost you a response.
 
 Required Streamlit secrets to enable sending:
-    ORGANISER_EMAIL = "wpsclientconnect@gmail.com"
-    SMTP_HOST       = "smtp.gmail.com"
+    ORGANISER_EMAIL = "sangy@example.com"
+    SMTP_HOST       = "smtp.office365.com"
     SMTP_PORT       = 587
-    SMTP_USERNAME   = "wpsclientconnect@gmail.com"
+    SMTP_USERNAME   = "sangy@example.com"
     SMTP_PASSWORD   = "pcuwrgnpamivcslf"
 """
 
@@ -121,10 +121,18 @@ def send_rsvp_emails(client_email, name, company, response_label, is_known_clien
         return True, "Confirmation emails sent."
 
     except smtplib.SMTPAuthenticationError:
-        return False, (
-            "Mail server rejected the login. If this is a Microsoft 365 account, "
-            "SMTP AUTH is most likely disabled by IT."
-        )
+        smtp_host = (_secret("SMTP_HOST") or "").lower()
+        if "gmail" in smtp_host:
+            hint = (
+                "This looks like a Gmail account. Make sure 2-Step Verification is turned "
+                "on for it, and that SMTP_PASSWORD is a 16-character App Password from "
+                "myaccount.google.com/apppasswords - not the account's normal login password."
+            )
+        elif "office365" in smtp_host or "outlook" in smtp_host:
+            hint = "If this is a Microsoft 365 account, SMTP AUTH is most likely disabled by IT."
+        else:
+            hint = "Double-check SMTP_USERNAME and SMTP_PASSWORD are correct for this mail server."
+        return False, f"Mail server rejected the login. {hint}"
     except smtplib.SMTPException as exc:
         return False, f"Mail server error: {exc}"
     except Exception as exc:
