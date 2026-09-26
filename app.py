@@ -29,7 +29,7 @@ LOGO_DATA_URI = _load_logo_base64()
 try:
     initialize_database()
 except KeyError:
-    st.set_page_config(page_title="Client Connect 2026", page_icon="🔗")
+    st.set_page_config(page_title="Sunset Social 2026", page_icon="🔗")
     st.error(
         "Database connection is not configured yet. Add a `DATABASE_URL` secret "
         "in Streamlit Cloud under Manage app → Settings → Secrets, then reboot the app."
@@ -62,7 +62,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-EVENT_NAME = "Client Connect 2026"
+EVENT_NAME = "Sunset Social 2026"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
 EVENT_DATE = "Friday, 23 October 2026"
 EVENT_TIME = "6:00 PM onwards"
