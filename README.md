@@ -1,7 +1,6 @@
-# Client Connect 2026 Demo
+# Sunset Social 2026
 
-Dummy-data demonstration version.
-
+"RSVP for Sunset Social 2026, our client evening on 23 October."
 Run locally:
 `python -m streamlit run app.py`
 
