@@ -1017,6 +1017,48 @@ elif page == "Invitation Tracker":
         m3.metric("Not Yet Sent", len(inv_df) - sent_total)
         st.progress(sent_total / len(inv_df))
 
+        with st.expander("Bulk mark: paste the emails you already sent to", expanded="inv_paste_result" in st.session_state):
+            st.caption(
+                "Paste email IDs (one per line, or separated by commas/semicolons/spaces). "
+                "Copy them straight from your Outlook 'Sent' list or an Excel column."
+            )
+            pasted = st.text_area("Email IDs", height=160, key="inv_paste_emails")
+            if st.button("Mark these as Invitation Sent", type="primary", key="inv_paste_btn"):
+                import re as _re
+                pasted_emails = {
+                    e.strip().lower()
+                    for e in _re.split(r"[\s,;]+", pasted or "")
+                    if "@" in e
+                }
+                if not pasted_emails:
+                    st.error("No email IDs found in what you pasted.")
+                else:
+                    known = {
+                        str(r["Email"]).strip().lower(): int(r["Client ID"])
+                        for _, r in inv_df.iterrows()
+                    }
+                    matched = [known[e] for e in pasted_emails if e in known]
+                    unmatched = sorted(e for e in pasted_emails if e not in known)
+                    if matched:
+                        connection = get_connection()
+                        for cid in matched:
+                            connection.execute(
+                                "UPDATE clients SET invitation_sent = 1 WHERE id = ?", (cid,)
+                            )
+                        connection.commit()
+                        connection.close()
+                    st.session_state["inv_paste_result"] = (len(matched), unmatched)
+                    st.rerun()
+
+            if "inv_paste_result" in st.session_state:
+                done_count, missed = st.session_state.pop("inv_paste_result")
+                st.success(f"{done_count} client(s) marked as Invitation Sent.")
+                if missed:
+                    st.warning(
+                        f"{len(missed)} email(s) were not found in your client list "
+                        "(check spelling or add them under Clients):\n\n" + "\n".join(missed)
+                    )
+
         f1, f2 = st.columns([2, 1])
         inv_search = f1.text_input(
             "Search clients",
