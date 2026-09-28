@@ -29,19 +29,19 @@ LOGO_DATA_URI = _load_logo_base64()
 try:
     initialize_database()
 except KeyError:
-    st.set_page_config(page_title="Sunset Social 2026", page_icon="🔗")
+    st.set_page_config(page_title="Sunset Social", page_icon="🔗")
     st.error(
         "Database connection is not configured yet. Add a `DATABASE_URL` secret "
         "in Streamlit Cloud under Manage app → Settings → Secrets, then reboot the app."
     )
     st.stop()
 except Exception as exc:
-    st.set_page_config(page_title="Sunset Social 2026", page_icon="🔗")
+    st.set_page_config(page_title="Sunset Social", page_icon="🔗")
     st.error(f"Could not connect to the database. Check your DATABASE_URL secret. ({exc})")
     st.stop()
 
 st.set_page_config(
-    page_title="Sunset Social 2026",
+    page_title="Sunset Social",
     page_icon="🔗",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -62,7 +62,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-EVENT_NAME = "Client Connect 2026"
+EVENT_NAME = "Sunset Social"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
 EVENT_DATE = "Friday, 23 October 2026"
 EVENT_TIME = "6:00 PM onwards"
@@ -267,7 +267,7 @@ if show_rsvp_page:
 # admin password never reaches any of this, regardless of which URL they land on.
 
 if not st.session_state.get("admin_authenticated"):
-    st.markdown("### Client Connect 2026 — Admin Login")
+    st.markdown("### Sunset Social — Admin Login")
     entered_password = st.text_input("Password", type="password", key="admin_password_input")
     if st.button("Log in", type="primary"):
         try:
@@ -348,7 +348,7 @@ st.markdown(
 # ============================================================
 
 with st.sidebar:
-    st.markdown("## Client Connect")
+    st.markdown("## Sunset Social")
     st.caption("Event Management")
     st.divider()
 
@@ -768,7 +768,7 @@ elif page == "Clients":
         st.download_button(
             "Export Client List",
             data=filtered_df.to_csv(index=False).encode("utf-8"),
-            file_name="Client_Connect_2026_Client_List.csv",
+            file_name="Sunset_Social_Client_List.csv",
             mime="text/csv",
             key="export_clients",
         )
@@ -972,7 +972,7 @@ elif page == "Invitations":
         st.download_button(
             "Export Outlook Invitation List",
             data=contact_df.to_csv(index=False).encode("utf-8"),
-            file_name="Client_Connect_2026_Outlook_Invitation_List.csv",
+            file_name="Sunset_Social_Outlook_Invitation_List.csv",
             mime="text/csv",
             key="export_invitation_list",
         )
@@ -1124,7 +1124,7 @@ elif page == "RSVP Tracker":
         st.download_button(
             "Export RSVP Tracker",
             data=filtered.to_csv(index=False).encode("utf-8"),
-            file_name="Client_Connect_2026_RSVP_Tracker.csv",
+            file_name="Sunset_Social_RSVP_Tracker.csv",
             mime="text/csv",
             key="export_rsvp",
         )
@@ -1171,7 +1171,7 @@ elif page == "Follow-ups":
         st.download_button(
             "Export Follow-up List",
             data=pending_df.to_csv(index=False).encode("utf-8"),
-            file_name="Client_Connect_2026_Follow_Up_List.csv",
+            file_name="Sunset_Social_Follow_Up_List.csv",
             mime="text/csv",
             key="export_followups",
         )
@@ -1311,7 +1311,7 @@ elif page == "Reports":
     st.download_button(
         "Export Event Summary",
         data=report.to_csv(index=False).encode("utf-8"),
-        file_name="Client_Connect_2026_Event_Summary.csv",
+        file_name="Sunset_Social_Event_Summary.csv",
         mime="text/csv",
         key="export_report",
     )
