@@ -29,19 +29,19 @@ LOGO_DATA_URI = _load_logo_base64()
 try:
     initialize_database()
 except KeyError:
-    st.set_page_config(page_title="Sunset Social", page_icon="🔗")
+    st.set_page_config(page_title="Sunset Social 2026", page_icon="🔗")
     st.error(
         "Database connection is not configured yet. Add a `DATABASE_URL` secret "
         "in Streamlit Cloud under Manage app → Settings → Secrets, then reboot the app."
     )
     st.stop()
 except Exception as exc:
-    st.set_page_config(page_title="Sunset Social", page_icon="🔗")
+    st.set_page_config(page_title="Sunset Social 2026", page_icon="🔗")
     st.error(f"Could not connect to the database. Check your DATABASE_URL secret. ({exc})")
     st.stop()
 
 st.set_page_config(
-    page_title="Sunset Social",
+    page_title="Sunset Social 2026",
     page_icon="🔗",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -62,7 +62,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-EVENT_NAME = "Sunset Social"
+EVENT_NAME = "Sunset Social 2026"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
 EVENT_DATE = "Friday, 23 October 2026"
 EVENT_TIME = "6:00 PM onwards"
@@ -267,7 +267,7 @@ if show_rsvp_page:
 # admin password never reaches any of this, regardless of which URL they land on.
 
 if not st.session_state.get("admin_authenticated"):
-    st.markdown("### Sunset Social — Admin Login")
+    st.markdown("### Sunset Social 2026 — Admin Login")
     entered_password = st.text_input("Password", type="password", key="admin_password_input")
     if st.button("Log in", type="primary"):
         try:
@@ -348,7 +348,7 @@ st.markdown(
 # ============================================================
 
 with st.sidebar:
-    st.markdown("## Sunset Social")
+    st.markdown("## Sunset Social 2026")
     st.caption("Event Management")
     st.divider()
 
