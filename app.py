@@ -358,6 +358,7 @@ with st.sidebar:
             "Dashboard",
             "Clients",
             "Invitations",
+            "Invitation Tracker",
             "RSVP Tracker",
             "Follow-ups",
             "Event Check-in",
@@ -403,11 +404,12 @@ if page == "Dashboard":
             f"Open RSVP Tracker and filter by 'Unverified only' to review them."
         )
 
-    columns = st.columns(6)
+    columns = st.columns(7)
     for column, (title, value) in zip(
         columns,
         [
             ("INVITED", total_clients),
+            ("INVITE SENT", invitation_sent),
             ("ACCEPTED", accepted),
             ("DECLINED", declined),
             ("TENTATIVE", tentative),
@@ -976,6 +978,134 @@ elif page == "Invitations":
             mime="text/csv",
             key="export_invitation_list",
         )
+
+
+# ============================================================
+# INVITATION TRACKER
+# ============================================================
+
+elif page == "Invitation Tracker":
+    st.markdown("<div class='section-title'>Invitation Tracker</div>", unsafe_allow_html=True)
+    st.write("Tick the clients you have sent the invitation to, then click Save. The Dashboard updates automatically.")
+
+    connection = get_connection()
+    inv_df = pd.read_sql_query(
+        """
+        SELECT
+            id AS "Client ID",
+            company AS "Company",
+            contact_name AS "Contact Name",
+            email AS "Email",
+            rsvp_status AS "RSVP Status",
+            invitation_sent AS "Invitation Sent"
+        FROM clients
+        ORDER BY company, contact_name
+        """,
+        connection,
+    )
+    connection.close()
+
+    if inv_df.empty:
+        st.info("No clients have been added yet. Go to Clients first.")
+    else:
+        inv_df["Invitation Sent"] = inv_df["Invitation Sent"].fillna(0).astype(int).astype(bool)
+
+        sent_total = int(inv_df["Invitation Sent"].sum())
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Clients", len(inv_df))
+        m2.metric("Invitation Sent", sent_total)
+        m3.metric("Not Yet Sent", len(inv_df) - sent_total)
+        st.progress(sent_total / len(inv_df))
+
+        f1, f2 = st.columns([2, 1])
+        inv_search = f1.text_input(
+            "Search clients",
+            placeholder="Company, contact name or email...",
+            key="inv_tracker_search",
+        )
+        inv_filter = f2.selectbox(
+            "Show", ["All", "Not yet sent", "Sent"], key="inv_tracker_filter"
+        )
+
+        view_df = inv_df.copy()
+        if inv_search:
+            term = inv_search.lower()
+            view_df = view_df[
+                view_df["Company"].astype(str).str.lower().str.contains(term, na=False)
+                | view_df["Contact Name"].astype(str).str.lower().str.contains(term, na=False)
+                | view_df["Email"].astype(str).str.lower().str.contains(term, na=False)
+            ]
+        if inv_filter == "Not yet sent":
+            view_df = view_df[~view_df["Invitation Sent"]]
+        elif inv_filter == "Sent":
+            view_df = view_df[view_df["Invitation Sent"]]
+
+        if view_df.empty:
+            st.info("No clients match this view.")
+        else:
+            edited_df = st.data_editor(
+                view_df,
+                use_container_width=True,
+                hide_index=True,
+                disabled=["Client ID", "Company", "Contact Name", "Email", "RSVP Status"],
+                column_config={
+                    "Invitation Sent": st.column_config.CheckboxColumn(
+                        "Invitation Sent", help="Tick once you have sent this client the invitation."
+                    ),
+                    "Client ID": st.column_config.NumberColumn("Client ID", width="small"),
+                },
+                key="inv_tracker_editor",
+            )
+
+            original = dict(zip(view_df["Client ID"], view_df["Invitation Sent"]))
+            changes = [
+                (int(cid), bool(new))
+                for cid, new in zip(edited_df["Client ID"], edited_df["Invitation Sent"])
+                if bool(original.get(cid)) != bool(new)
+            ]
+
+            if st.button(
+                f"Save Changes ({len(changes)})" if changes else "Save Changes",
+                type="primary",
+                key="inv_tracker_save",
+                disabled=not changes,
+            ):
+                connection = get_connection()
+                for cid, new_value in changes:
+                    connection.execute(
+                        "UPDATE clients SET invitation_sent = ? WHERE id = ?",
+                        (1 if new_value else 0, cid),
+                    )
+                connection.commit()
+                connection.close()
+                st.success(f"Saved. {len(changes)} client(s) updated.")
+                st.rerun()
+
+            b1, b2 = st.columns(2)
+            if b1.button("Tick everyone shown as sent", key="inv_tracker_tick_shown"):
+                ids = [int(i) for i in view_df["Client ID"]]
+                connection = get_connection()
+                for cid in ids:
+                    connection.execute("UPDATE clients SET invitation_sent = 1 WHERE id = ?", (cid,))
+                connection.commit()
+                connection.close()
+                st.rerun()
+            if b2.button("Untick everyone shown", key="inv_tracker_untick_shown"):
+                ids = [int(i) for i in view_df["Client ID"]]
+                connection = get_connection()
+                for cid in ids:
+                    connection.execute("UPDATE clients SET invitation_sent = 0 WHERE id = ?", (cid,))
+                connection.commit()
+                connection.close()
+                st.rerun()
+
+            st.download_button(
+                "Export This View",
+                data=edited_df.to_csv(index=False).encode("utf-8"),
+                file_name="Sunset_Social_Invitation_Tracker.csv",
+                mime="text/csv",
+                key="export_inv_tracker",
+            )
 
 
 # ============================================================
