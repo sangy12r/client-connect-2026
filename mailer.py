@@ -1,4 +1,4 @@
-"""Email notifications for Client Connect 2026 RSVPs.
+"""Email notifications for Sunset Social 2026 RSVPs.
 
 Sending is entirely optional. If SMTP settings are missing or the mail server
 refuses the connection, send_rsvp_emails() returns a failure reason instead of
