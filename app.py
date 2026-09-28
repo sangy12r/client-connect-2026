@@ -36,12 +36,12 @@ except KeyError:
     )
     st.stop()
 except Exception as exc:
-    st.set_page_config(page_title="Client Connect 2026", page_icon="🔗")
+    st.set_page_config(page_title="Sunset Social 2026", page_icon="🔗")
     st.error(f"Could not connect to the database. Check your DATABASE_URL secret. ({exc})")
     st.stop()
 
 st.set_page_config(
-    page_title="Client Connect 2026",
+    page_title="Sunset Social 2026",
     page_icon="🔗",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -62,7 +62,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-EVENT_NAME = "Sunset Social 2026"
+EVENT_NAME = "Client Connect 2026"
 EVENT_SUBTITLE = "Wilhelmsen Port Services, India · Client Networking Evening"
 EVENT_DATE = "Friday, 23 October 2026"
 EVENT_TIME = "6:00 PM onwards"
@@ -792,6 +792,53 @@ elif page == "Clients":
                 connection.commit()
                 connection.close()
                 st.success("Client deleted.")
+                st.rerun()
+
+        # ---- Verify unverified online RSVPs (no Excel re-upload needed) ----
+        connection = get_connection()
+        unverified_rows = connection.execute(
+            "SELECT id, contact_name, company, email FROM clients "
+            "WHERE source = 'Online (Unverified)' ORDER BY company, contact_name"
+        ).fetchall()
+        connection.close()
+
+        if unverified_rows:
+            st.divider()
+            st.subheader("Verify Online RSVPs")
+            st.caption(
+                "These people RSVP'd online but weren't on your imported list. "
+                "Marking them as verified keeps their RSVP exactly as is and "
+                "removes the 'Unverified' flag."
+            )
+            verify_options = {
+                f"{r[1]} · {r[2]} · {r[3]} (ID {r[0]})": r[0] for r in unverified_rows
+            }
+            verify_picks = st.multiselect(
+                "Select entries to mark as verified",
+                list(verify_options.keys()),
+                key="verify_client_picks",
+            )
+            v_col1, v_col2 = st.columns(2)
+            if v_col1.button("Verify Selected", type="primary", key="verify_selected_btn",
+                             disabled=not verify_picks):
+                connection = get_connection()
+                for label in verify_picks:
+                    connection.execute(
+                        "UPDATE clients SET source = 'Imported' WHERE id = ?",
+                        (verify_options[label],),
+                    )
+                connection.commit()
+                connection.close()
+                st.success(f"{len(verify_picks)} entr{'y' if len(verify_picks) == 1 else 'ies'} marked as verified.")
+                st.rerun()
+            if v_col2.button("Verify All Unverified", key="verify_all_btn"):
+                connection = get_connection()
+                connection.execute(
+                    "UPDATE clients SET source = 'Imported' WHERE source = 'Online (Unverified)'"
+                )
+                connection.commit()
+                connection.close()
+                st.success("All online RSVPs marked as verified.")
                 st.rerun()
 
 
